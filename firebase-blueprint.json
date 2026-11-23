@@ -1,0 +1,371 @@
+{
+  "entities": {
+    "AthleteProfile": {
+      "title": "AthleteProfile",
+      "description": "Public pickleball athlete profile, DUPR rating, skill tier (A/B/C), gender, match statistics, and nearby discovery coordinates (no PII).",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "displayName": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "gender": { "type": "string", "enum": ["male", "female"] },
+        "skillTier": { "type": "string", "enum": ["A", "B", "C"] },
+        "club": { "type": "string", "maxLength": 80 },
+        "city": { "type": "string", "maxLength": 60 },
+        "district": { "type": "string", "maxLength": 60 },
+        "duprRating": { "type": "number" },
+        "wins": { "type": "number" },
+        "losses": { "type": "number" },
+        "pointsFor": { "type": "number" },
+        "pointsAgainst": { "type": "number" },
+        "playingStyle": { "type": "string", "maxLength": 60 },
+        "availableForMatch": { "type": "boolean" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "avatarInitials": { "type": "string", "maxLength": 4 },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "displayName", "city", "duprRating", "wins", "losses", "visibility", "createdAt", "updatedAt"]
+    },
+    "UserPrivateSecurity": {
+      "title": "UserPrivateSecurity",
+      "description": "Owner-only 2FA TOTP secret, recovery codes, notification preferences, and theme sync settings.",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "twoFactorEnabled": { "type": "boolean" },
+        "totpSecret": { "type": "string", "maxLength": 128 },
+        "recoveryCodes": { "type": "array" },
+        "themeAccent": { "type": "string", "enum": ["cobalt", "emerald", "amber", "crimson", "violet"] },
+        "darkMode": { "type": "boolean" },
+        "language": { "type": "string", "enum": ["vi", "en"] },
+        "notifyUpcomingMatch": { "type": "boolean" },
+        "notifyScoreUpdate": { "type": "boolean" },
+        "notifyChatMention": { "type": "boolean" },
+        "notifyPaymentReceipt": { "type": "boolean" },
+        "autoCloudBackup": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "twoFactorEnabled", "updatedAt"]
+    },
+    "Tournament": {
+      "title": "Tournament",
+      "description": "Pickleball tournament metadata, format (doubles or team), skill cap, entry fee, VietQR bank details, and lifecycle status.",
+      "type": "object",
+      "properties": {
+        "organizerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 3, "maxLength": 120 },
+        "format": { "type": "string", "enum": ["doubles", "team"] },
+        "location": { "type": "string", "maxLength": 120 },
+        "city": { "type": "string", "maxLength": 60 },
+        "startDate": { "type": "string", "maxLength": 32 },
+        "category": { "type": "string", "maxLength": 60 },
+        "skillCap": { "type": "number" },
+        "entryFeeVnd": { "type": "number" },
+        "maxTeams": { "type": "number" },
+        "registeredCount": { "type": "number" },
+        "status": { "type": "string", "enum": ["open", "drawn", "live", "completed"] },
+        "bankCode": { "type": "string", "maxLength": 20 },
+        "bankAccount": { "type": "string", "maxLength": 32 },
+        "bankAccountName": { "type": "string", "maxLength": 80 },
+        "prizePoolVnd": { "type": "number" },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["organizerUid", "title", "location", "city", "startDate", "category", "skillCap", "entryFeeVnd", "maxTeams", "registeredCount", "status", "visibility", "createdAt", "updatedAt"]
+    },
+    "Registration": {
+      "title": "Registration",
+      "description": "Tournament registration entry with skill tier A/B/C, gender, VietQR transfer reference, and payment receipt status.",
+      "type": "object",
+      "properties": {
+        "tournamentId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "organizerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "athleteUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "teamName": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "partnerName": { "type": "string", "maxLength": 80 },
+        "gender": { "type": "string", "enum": ["male", "female"] },
+        "skillTier": { "type": "string", "enum": ["A", "B", "C"] },
+        "partnerGender": { "type": "string", "enum": ["male", "female", ""] },
+        "partnerSkillTier": { "type": "string", "enum": ["A", "B", "C", ""] },
+        "combinedDupr": { "type": "number" },
+        "category": { "type": "string", "maxLength": 60 },
+        "amountVnd": { "type": "number" },
+        "transferCode": { "type": "string", "maxLength": 48 },
+        "paymentStatus": { "type": "string", "enum": ["pending", "paid", "verified"] },
+        "receiptCode": { "type": "string", "maxLength": 48 },
+        "checkedIn": { "type": "boolean" },
+        "checkedInAt": { "type": "string", "maxLength": 40 },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["tournamentId", "organizerUid", "athleteUid", "teamName", "category", "amountVnd", "transferCode", "paymentStatus", "visibility", "createdAt", "updatedAt"]
+    },
+    "TournamentCheckIn": {
+      "title": "TournamentCheckIn",
+      "description": "Venue QR check-in attendance record created by verified Admin when scanning an athlete's QR pass.",
+      "type": "object",
+      "properties": {
+        "tournamentId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "tournamentTitle": { "type": "string", "maxLength": 120 },
+        "athleteId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "athleteName": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "skillTier": { "type": "string", "enum": ["A", "B", "C"] },
+        "gender": { "type": "string", "enum": ["male", "female"] },
+        "club": { "type": "string", "maxLength": 80 },
+        "status": { "type": "string", "enum": ["checked_in"] },
+        "checkedInByUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "checkedInByEmail": { "type": "string", "maxLength": 120 },
+        "checkedInAtIso": { "type": "string", "maxLength": 40 },
+        "kitIssued": { "type": "boolean" },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["tournamentId", "tournamentTitle", "athleteId", "athleteName", "status", "checkedInByUid", "checkedInAtIso", "visibility", "createdAt", "updatedAt"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "Real-time pickleball match record supporting live scoring, bracket progression, and H2H history.",
+      "type": "object",
+      "properties": {
+        "tournamentId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "tournamentTitle": { "type": "string", "maxLength": 120 },
+        "organizerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "roundLabel": { "type": "string", "maxLength": 40 },
+        "groupName": { "type": "string", "maxLength": 24 },
+        "bracketSlot": { "type": "string", "maxLength": 24 },
+        "courtName": { "type": "string", "maxLength": 40 },
+        "scheduledTime": { "type": "string", "maxLength": 40 },
+        "playerAUid": { "type": "string", "maxLength": 128 },
+        "playerBUid": { "type": "string", "maxLength": 128 },
+        "teamAName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "teamBName": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "scoreA": { "type": "number" },
+        "scoreB": { "type": "number" },
+        "setsA": { "type": "number" },
+        "setsB": { "type": "number" },
+        "setHistory": { "type": "array" },
+        "targetPoints": { "type": "number" },
+        "servingSide": { "type": "string", "enum": ["A", "B"] },
+        "serverNumber": { "type": "number" },
+        "status": { "type": "string", "enum": ["upcoming", "live", "completed"] },
+        "winnerSide": { "type": "string", "enum": ["", "A", "B"] },
+        "ratingDelta": { "type": "number" },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["tournamentId", "organizerUid", "roundLabel", "courtName", "teamAName", "teamBName", "scoreA", "scoreB", "setsA", "setsB", "targetPoints", "servingSide", "status", "visibility", "createdAt", "updatedAt"]
+    },
+    "TeamEntry": {
+      "title": "TeamEntry",
+      "description": "Team tournament entry with group assignment and roster of athletes (each with gender and A/B/C skill tier).",
+      "type": "object",
+      "properties": {
+        "organizerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "tournamentId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "shortCode": { "type": "string", "maxLength": 10 },
+        "groupName": { "type": "string", "enum": ["Bảng A", "Bảng B"] },
+        "city": { "type": "string", "maxLength": 60 },
+        "members": { "type": "array" },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["organizerUid", "tournamentId", "name", "groupName", "members", "visibility", "createdAt", "updatedAt"]
+    },
+    "TeamTie": {
+      "title": "TeamTie",
+      "description": "Team-vs-Team tie supporting 4 gender-filtered doubles sub-matches, Group Stage 2-2 draws, and Knockout Serie A/B singles tie-breakers.",
+      "type": "object",
+      "properties": {
+        "organizerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "tournamentId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "stage": { "type": "string", "enum": ["group", "serieA", "serieB"] },
+        "groupName": { "type": "string", "maxLength": 24 },
+        "roundLabel": { "type": "string", "maxLength": 40 },
+        "bracketSlot": { "type": "string", "maxLength": 24 },
+        "teamAId": { "type": "string", "maxLength": 128 },
+        "teamBId": { "type": "string", "maxLength": 128 },
+        "teamAName": { "type": "string", "maxLength": 80 },
+        "teamBName": { "type": "string", "maxLength": 80 },
+        "subMatches": { "type": "array" },
+        "tieBreak": { "type": "object" },
+        "courtName": { "type": "string", "maxLength": 40 },
+        "scheduledSlot": { "type": "number" },
+        "scheduledTime": { "type": "string", "maxLength": 24 },
+        "status": { "type": "string", "enum": ["upcoming", "live", "completed"] },
+        "forfeitSide": { "type": "string", "enum": ["", "A", "B"] },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["organizerUid", "tournamentId", "stage", "roundLabel", "teamAId", "teamBId", "teamAName", "teamBName", "subMatches", "status", "visibility", "createdAt", "updatedAt"]
+    },
+    "CommunityPost": {
+      "title": "CommunityPost",
+      "description": "Community feed post sharing match highlights, recaps, and discussions.",
+      "type": "object",
+      "properties": {
+        "authorUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "authorName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "authorRating": { "type": "number" },
+        "content": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "tag": { "type": "string", "maxLength": 40 },
+        "imageUrl": { "type": "string", "maxLength": 300 },
+        "likesCount": { "type": "number" },
+        "commentsCount": { "type": "number" },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorUid", "authorName", "content", "likesCount", "commentsCount", "visibility", "createdAt", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Real-time athlete group chat message inside a tournament or regional channel.",
+      "type": "object",
+      "properties": {
+        "roomId": { "type": "string", "maxLength": 64, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "senderName": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "senderRating": { "type": "number" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 800 },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["roomId", "senderUid", "senderName", "text", "visibility", "createdAt"]
+    },
+    "NotificationItem": {
+      "title": "NotificationItem",
+      "description": "Personalized push notification record per athlete.",
+      "type": "object",
+      "properties": {
+        "recipientUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "body": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "category": { "type": "string", "enum": ["match", "payment", "chat", "challenge", "system"] },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["recipientUid", "title", "body", "category", "read", "createdAt"]
+    },
+    "ChallengeInvite": {
+      "title": "ChallengeInvite",
+      "description": "Friendly match invitation sent between nearby athletes.",
+      "type": "object",
+      "properties": {
+        "fromUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "fromName": { "type": "string", "maxLength": 80 },
+        "toUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "toName": { "type": "string", "maxLength": 80 },
+        "courtName": { "type": "string", "maxLength": 100 },
+        "proposedTime": { "type": "string", "maxLength": 60 },
+        "message": { "type": "string", "maxLength": 300 },
+        "status": { "type": "string", "enum": ["pending", "accepted", "declined"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fromUid", "fromName", "toUid", "toName", "courtName", "proposedTime", "status", "createdAt", "updatedAt"]
+    },
+    "CloudBackupSnapshot": {
+      "title": "CloudBackupSnapshot",
+      "description": "Owner-only automatic or manual cloud backup metadata snapshot.",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "label": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "tournamentsCount": { "type": "number" },
+        "matchesCount": { "type": "number" },
+        "athletesCount": { "type": "number" },
+        "deviceName": { "type": "string", "maxLength": 80 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "label", "tournamentsCount", "matchesCount", "athletesCount", "createdAt"]
+    },
+    "ClubProfile": {
+      "title": "ClubProfile",
+      "description": "SportConnect-style Pickleball Club with member counter, club fund ledger (Thu/Chi), and open-play social sessions.",
+      "type": "object",
+      "properties": {
+        "ownerUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "city": { "type": "string", "minLength": 2, "maxLength": 60 },
+        "homeCourt": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 400 },
+        "skillRange": { "type": "string", "maxLength": 40 },
+        "membersCount": { "type": "number" },
+        "fundBalanceVnd": { "type": "number" },
+        "fundEntries": { "type": "array" },
+        "socialSessions": { "type": "array" },
+        "visibility": { "type": "string", "enum": ["public"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerUid", "name", "city", "membersCount", "fundBalanceVnd", "fundEntries", "socialSessions", "visibility", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/athletes/{athleteId}": {
+      "schema": { "$ref": "#/entities/AthleteProfile" },
+      "description": "Public athlete directory and real-time DUPR rankings."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateSecurity" },
+      "description": "Strictly owner-only 2FA TOTP secrets, recovery codes, and notification/theme preferences."
+    },
+    "/tournaments/{tournamentId}": {
+      "schema": { "$ref": "#/entities/Tournament" },
+      "description": "Pickleball tournaments with entry fees, VietQR config, and draw statuses."
+    },
+    "/registrations/{registrationId}": {
+      "schema": { "$ref": "#/entities/Registration" },
+      "description": "Athlete registrations and VietQR payment receipts."
+    },
+    "/checkins/{checkinId}": {
+      "schema": { "$ref": "#/entities/TournamentCheckIn" },
+      "description": "Admin-verified athlete venue QR check-in attendance records per tournament."
+    },
+    "/matches/{matchId}": {
+      "schema": { "$ref": "#/entities/Match" },
+      "description": "Live and completed matches powering live scores, tournament standings, and H2H."
+    },
+    "/teamEntries/{teamId}": {
+      "schema": { "$ref": "#/entities/TeamEntry" },
+      "description": "Team Cup rosters with gender and A/B/C skill tier metadata."
+    },
+    "/teamTies/{tieId}": {
+      "schema": { "$ref": "#/entities/TeamTie" },
+      "description": "Team Cup ties (Group Stage 2-2 draw, Serie A & Serie B knockout brackets with singles tie-breaker)."
+    },
+    "/communityPosts/{postId}": {
+      "schema": { "$ref": "#/entities/CommunityPost" },
+      "description": "Community feed posts and match recaps."
+    },
+    "/chatRooms/{roomId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Real-time group chat channels for athletes."
+    },
+    "/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/NotificationItem" },
+      "description": "Personalized user notifications."
+    },
+    "/challenges/{challengeId}": {
+      "schema": { "$ref": "#/entities/ChallengeInvite" },
+      "description": "Nearby match challenge invitations."
+    },
+    "/cloudBackups/{backupId}": {
+      "schema": { "$ref": "#/entities/CloudBackupSnapshot" },
+      "description": "Owner-only cloud backup snapshots."
+    },
+    "/clubs/{clubId}": {
+      "schema": { "$ref": "#/entities/ClubProfile" },
+      "description": "Public Pickleball clubs with fund ledgers and open-play social sessions."
+    }
+  }
+}

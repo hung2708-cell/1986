@@ -1,0 +1,740 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // Primitive Helpers (Eight Pillars)
+    // =========================================================================
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isVerified() && (
+        request.auth.token.email == 'hung.2708@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isShortStr(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isOptionalStr(data, key, maxLen) {
+      return !(key in data) || (data[key] is string && data[key].size() <= maxLen);
+    }
+
+    function isOptionalNum(data, key, minVal, maxVal) {
+      return !(key in data) || (data[key] is number && data[key] >= minVal && data[key] <= maxVal);
+    }
+
+    // =========================================================================
+    // Validation Blueprints
+    // =========================================================================
+    function isValidAthlete(data) {
+      return data.keys().hasAll(['ownerUid', 'displayName', 'city', 'duprRating', 'wins', 'losses', 'visibility', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly([
+          'ownerUid', 'displayName', 'gender', 'skillTier', 'club', 'city', 'district', 'duprRating',
+          'wins', 'losses', 'pointsFor', 'pointsAgainst', 'playingStyle',
+          'availableForMatch', 'lat', 'lng', 'avatarInitials', 'visibility',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerUid)
+        && isShortStr(data.displayName, 2, 80)
+        && (!('gender' in data) || data.gender in ['male', 'female'])
+        && (!('skillTier' in data) || data.skillTier in ['A', 'B', 'C'])
+        && isOptionalStr(data, 'club', 80)
+        && isShortStr(data.city, 1, 60)
+        && isOptionalStr(data, 'district', 60)
+        && data.duprRating is number && data.duprRating >= 1.0 && data.duprRating <= 8.5
+        && data.wins is number && data.wins >= 0 && data.wins <= 10000
+        && data.losses is number && data.losses >= 0 && data.losses <= 10000
+        && isOptionalNum(data, 'pointsFor', 0, 1000000)
+        && isOptionalNum(data, 'pointsAgainst', 0, 1000000)
+        && isOptionalStr(data, 'playingStyle', 60)
+        && (!('availableForMatch' in data) || data.availableForMatch is bool)
+        && isOptionalNum(data, 'lat', -90, 90)
+        && isOptionalNum(data, 'lng', -180, 180)
+        && isOptionalStr(data, 'avatarInitials', 4)
+        && data.visibility == 'public'
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidUserPrivate(data) {
+      return data.keys().hasAll(['ownerUid', 'twoFactorEnabled', 'updatedAt'])
+        && data.keys().hasOnly([
+          'ownerUid', 'twoFactorEnabled', 'totpSecret', 'recoveryCodes',
+          'themeAccent', 'darkMode', 'language',
+          'notifyUpcomingMatch', 'notifyScoreUpdate', 'notifyChatMention', 'notifyPaymentReceipt',
+          'autoCloudBackup', 'updatedAt'
+        ])
+        && data.ownerUid == request.auth.uid
+        && data.twoFactorEnabled is bool
+        && isOptionalStr(data, 'totpSecret', 128)
+        && (!('recoveryCodes' in data) || (
+          data.recoveryCodes is list && data.recoveryCodes.size() <= 10 &&
+          (data.recoveryCodes.size() == 0 || (data.recoveryCodes[0] is string && data.recoveryCodes[0].size() <= 32))
+        ))
+        && (!('themeAccent' in data) || data.themeAccent in ['cobalt', 'emerald', 'amber', 'crimson', 'violet'])
+        && (!('darkMode' in data) || data.darkMode is bool)
+        && (!('language' in data) || data.language in ['vi', 'en'])
+        && (!('notifyUpcomingMatch' in data) || data.notifyUpcomingMatch is bool)
+        && (!('notifyScoreUpdate' in data) || data.notifyScoreUpdate is bool)
+        && (!('notifyChatMention' in data) || data.notifyChatMention is bool)
+        && (!('notifyPaymentReceipt' in data) || data.notifyPaymentReceipt is bool)
+        && (!('autoCloudBackup' in data) || data.autoCloudBackup is bool)
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTournament(data) {
+      return data.keys().hasAll([
+          'organizerUid', 'title', 'location', 'city', 'startDate', 'category',
+          'skillCap', 'entryFeeVnd', 'maxTeams', 'registeredCount', 'status',
+          'visibility', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'organizerUid', 'title', 'format', 'location', 'city', 'startDate', 'category',
+          'skillCap', 'entryFeeVnd', 'maxTeams', 'registeredCount', 'status',
+          'bankCode', 'bankAccount', 'bankAccountName', 'prizePoolVnd',
+          'visibility', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.organizerUid)
+        && isShortStr(data.title, 3, 120)
+        && (!('format' in data) || data.format in ['doubles', 'team'])
+        && isShortStr(data.location, 2, 120)
+        && isShortStr(data.city, 2, 60)
+        && isShortStr(data.startDate, 4, 32)
+        && isShortStr(data.category, 2, 60)
+        && data.skillCap is number && data.skillCap >= 2.0 && data.skillCap <= 15.0
+        && data.entryFeeVnd is number && data.entryFeeVnd >= 0 && data.entryFeeVnd <= 100000000
+        && data.maxTeams is number && data.maxTeams >= 4 && data.maxTeams <= 256
+        && data.registeredCount is number && data.registeredCount >= 0 && data.registeredCount <= 256
+        && data.status in ['open', 'drawn', 'live', 'completed']
+        && isOptionalStr(data, 'bankCode', 20)
+        && isOptionalStr(data, 'bankAccount', 32)
+        && isOptionalStr(data, 'bankAccountName', 80)
+        && isOptionalNum(data, 'prizePoolVnd', 0, 10000000000)
+        && data.visibility == 'public'
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidRegistration(data) {
+      return data.keys().hasAll([
+          'tournamentId', 'organizerUid', 'athleteUid', 'teamName', 'category',
+          'amountVnd', 'transferCode', 'paymentStatus', 'visibility', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'tournamentId', 'organizerUid', 'athleteUid', 'teamName', 'partnerName',
+          'gender', 'skillTier', 'partnerGender', 'partnerSkillTier',
+          'combinedDupr', 'category', 'amountVnd', 'transferCode', 'paymentStatus',
+          'receiptCode', 'checkedIn', 'checkedInAt', 'visibility', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.tournamentId)
+        && isValidId(data.organizerUid)
+        && isValidId(data.athleteUid)
+        && isShortStr(data.teamName, 2, 100)
+        && isOptionalStr(data, 'partnerName', 80)
+        && (!('gender' in data) || data.gender in ['male', 'female'])
+        && (!('skillTier' in data) || data.skillTier in ['A', 'B', 'C'])
+        && (!('partnerGender' in data) || data.partnerGender in ['male', 'female', ''])
+        && (!('partnerSkillTier' in data) || data.partnerSkillTier in ['A', 'B', 'C', ''])
+        && isOptionalNum(data, 'combinedDupr', 1.0, 16.0)
+        && isShortStr(data.category, 2, 60)
+        && data.amountVnd is number && data.amountVnd >= 0 && data.amountVnd <= 100000000
+        && isShortStr(data.transferCode, 4, 48)
+        && data.paymentStatus in ['pending', 'paid', 'verified']
+        && isOptionalStr(data, 'receiptCode', 48)
+        && (!('checkedIn' in data) || data.checkedIn is bool)
+        && isOptionalStr(data, 'checkedInAt', 40)
+        && data.visibility == 'public'
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCheckIn(data) {
+      return data.keys().hasAll([
+          'tournamentId', 'tournamentTitle', 'athleteId', 'athleteName',
+          'status', 'checkedInByUid', 'checkedInAtIso', 'visibility',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'tournamentId', 'tournamentTitle', 'athleteId', 'athleteName',
+          'skillTier', 'gender', 'club', 'status',
+          'checkedInByUid', 'checkedInByEmail', 'checkedInAtIso', 'kitIssued',
+          'visibility', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.tournamentId)
+        && isShortStr(data.tournamentTitle, 1, 120)
+        && isValidId(data.athleteId)
+        && isShortStr(data.athleteName, 2, 80)
+        && (!('skillTier' in data) || data.skillTier in ['A', 'B', 'C'])
+        && (!('gender' in data) || data.gender in ['male', 'female'])
+        && isOptionalStr(data, 'club', 80)
+        && data.status == 'checked_in'
+        && isValidId(data.checkedInByUid)
+        && isOptionalStr(data, 'checkedInByEmail', 120)
+        && isShortStr(data.checkedInAtIso, 10, 40)
+        && (!('kitIssued' in data) || data.kitIssued is bool)
+        && data.visibility == 'public'
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMatch(data) {
+      return data.keys().hasAll([
+          'tournamentId', 'organizerUid', 'roundLabel', 'courtName',
+          'teamAName', 'teamBName', 'scoreA', 'scoreB', 'setsA', 'setsB',
+          'targetPoints', 'servingSide', 'status', 'visibility', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'tournamentId', 'tournamentTitle', 'organizerUid', 'roundLabel', 'groupName', 'bracketSlot', 'courtName',
+          'scheduledTime', 'playerAUid', 'playerBUid', 'teamAName', 'teamBName',
+          'scoreA', 'scoreB', 'setsA', 'setsB', 'setHistory', 'targetPoints',
+          'servingSide', 'serverNumber', 'status', 'winnerSide', 'ratingDelta',
+          'visibility', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.tournamentId)
+        && isOptionalStr(data, 'tournamentTitle', 120)
+        && isValidId(data.organizerUid)
+        && isShortStr(data.roundLabel, 1, 40)
+        && isOptionalStr(data, 'groupName', 24)
+        && isOptionalStr(data, 'bracketSlot', 24)
+        && isShortStr(data.courtName, 1, 40)
+        && isOptionalStr(data, 'scheduledTime', 40)
+        && isOptionalStr(data, 'playerAUid', 128)
+        && isOptionalStr(data, 'playerBUid', 128)
+        && isShortStr(data.teamAName, 1, 100)
+        && isShortStr(data.teamBName, 1, 100)
+        && data.scoreA is number && data.scoreA >= 0 && data.scoreA <= 50
+        && data.scoreB is number && data.scoreB >= 0 && data.scoreB <= 50
+        && data.setsA is number && data.setsA >= 0 && data.setsA <= 5
+        && data.setsB is number && data.setsB >= 0 && data.setsB <= 5
+        && (!('setHistory' in data) || (
+          data.setHistory is list && data.setHistory.size() <= 5 &&
+          (data.setHistory.size() == 0 || (data.setHistory[0] is string && data.setHistory[0].size() <= 16))
+        ))
+        && data.targetPoints is number && data.targetPoints >= 7 && data.targetPoints <= 21
+        && data.servingSide in ['A', 'B']
+        && (!('serverNumber' in data) || data.serverNumber in [1, 2])
+        && data.status in ['upcoming', 'live', 'completed']
+        && (!('winnerSide' in data) || data.winnerSide in ['', 'A', 'B'])
+        && isOptionalNum(data, 'ratingDelta', -1.0, 1.0)
+        && data.visibility == 'public'
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTeamEntry(data) {
+      return data.keys().hasAll(['organizerUid', 'tournamentId', 'name', 'groupName', 'members', 'visibility', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly([
+          'organizerUid', 'tournamentId', 'name', 'shortCode', 'groupName', 'city',
+          'members', 'visibility', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.organizerUid)
+        && isValidId(data.tournamentId)
+        && isShortStr(data.name, 2, 80)
+        && isOptionalStr(data, 'shortCode', 10)
+        && data.groupName in ['Bảng A', 'Bảng B']
+        && isOptionalStr(data, 'city', 60)
+        && data.members is list && data.members.size() <= 16
+        && (data.members.size() == 0 || data.members[0] is map)
+        && data.visibility == 'public'
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTeamTie(data) {
+      return data.keys().hasAll([
+          'organizerUid', 'tournamentId', 'stage', 'roundLabel',
+          'teamAId', 'teamBId', 'teamAName', 'teamBName',
+          'subMatches', 'status', 'visibility', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'organizerUid', 'tournamentId', 'stage', 'groupName', 'roundLabel', 'bracketSlot',
+          'teamAId', 'teamBId', 'teamAName', 'teamBName',
+          'subMatches', 'tieBreak', 'courtName', 'scheduledSlot', 'scheduledTime',
+          'status', 'forfeitSide', 'visibility', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.organizerUid)
+        && isValidId(data.tournamentId)
+        && data.stage in ['group', 'serieA', 'serieB']
+        && isOptionalStr(data, 'groupName', 24)
+        && isShortStr(data.roundLabel, 1, 40)
+        && isOptionalStr(data, 'bracketSlot', 24)
+        && isShortStr(data.teamAId, 1, 128)
+        && isShortStr(data.teamBId, 1, 128)
+        && isShortStr(data.teamAName, 1, 80)
+        && isShortStr(data.teamBName, 1, 80)
+        && data.subMatches is list && data.subMatches.size() == 4 && data.subMatches[0] is map
+        && (!('tieBreak' in data) || data.tieBreak is map || data.tieBreak == null)
+        && isOptionalStr(data, 'courtName', 40)
+        && isOptionalNum(data, 'scheduledSlot', 0, 200)
+        && isOptionalStr(data, 'scheduledTime', 24)
+        && data.status in ['upcoming', 'live', 'completed']
+        && (!('forfeitSide' in data) || data.forfeitSide in ['', 'A', 'B'])
+        && data.visibility == 'public'
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPost(data) {
+      return data.keys().hasAll([
+          'authorUid', 'authorName', 'content', 'likesCount', 'commentsCount',
+          'visibility', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'authorUid', 'authorName', 'authorRating', 'content', 'tag',
+          'imageUrl', 'likesCount', 'commentsCount', 'visibility',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.authorUid)
+        && isShortStr(data.authorName, 1, 80)
+        && isOptionalNum(data, 'authorRating', 1.0, 8.5)
+        && isShortStr(data.content, 1, 1000)
+        && isOptionalStr(data, 'tag', 40)
+        && isOptionalStr(data, 'imageUrl', 300)
+        && data.likesCount is number && data.likesCount >= 0 && data.likesCount <= 1000000
+        && data.commentsCount is number && data.commentsCount >= 0 && data.commentsCount <= 100000
+        && data.visibility == 'public'
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidComment(data) {
+      return data.keys().hasAll(['authorUid', 'authorName', 'text', 'visibility', 'createdAt'])
+        && data.keys().hasOnly(['authorUid', 'authorName', 'text', 'visibility', 'createdAt'])
+        && data.authorUid == request.auth.uid
+        && isShortStr(data.authorName, 1, 80)
+        && isShortStr(data.text, 1, 400)
+        && data.visibility == 'public'
+        && data.createdAt is timestamp;
+    }
+
+    function isValidChatMessage(data) {
+      return data.keys().hasAll(['roomId', 'senderUid', 'senderName', 'text', 'visibility', 'createdAt'])
+        && data.keys().hasOnly(['roomId', 'senderUid', 'senderName', 'senderRating', 'text', 'visibility', 'createdAt'])
+        && isValidId(data.roomId)
+        && data.senderUid == request.auth.uid
+        && isShortStr(data.senderName, 1, 80)
+        && isOptionalNum(data, 'senderRating', 1.0, 8.5)
+        && isShortStr(data.text, 1, 800)
+        && data.visibility == 'public'
+        && data.createdAt is timestamp;
+    }
+
+    function isValidNotification(data) {
+      return data.keys().hasAll(['recipientUid', 'title', 'body', 'category', 'read', 'createdAt'])
+        && data.keys().hasOnly(['recipientUid', 'title', 'body', 'category', 'read', 'createdAt'])
+        && isValidId(data.recipientUid)
+        && isShortStr(data.title, 1, 120)
+        && isShortStr(data.body, 1, 300)
+        && data.category in ['match', 'payment', 'chat', 'challenge', 'system']
+        && data.read is bool
+        && data.createdAt is timestamp;
+    }
+
+    function isValidChallenge(data) {
+      return data.keys().hasAll(['fromUid', 'fromName', 'toUid', 'toName', 'courtName', 'proposedTime', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['fromUid', 'fromName', 'toUid', 'toName', 'courtName', 'proposedTime', 'message', 'status', 'createdAt', 'updatedAt'])
+        && isValidId(data.fromUid)
+        && isShortStr(data.fromName, 1, 80)
+        && isValidId(data.toUid)
+        && isShortStr(data.toName, 1, 80)
+        && isShortStr(data.courtName, 1, 100)
+        && isShortStr(data.proposedTime, 1, 60)
+        && isOptionalStr(data, 'message', 300)
+        && data.status in ['pending', 'accepted', 'declined']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidCloudBackup(data) {
+      return data.keys().hasAll(['ownerUid', 'label', 'tournamentsCount', 'matchesCount', 'athletesCount', 'createdAt'])
+        && data.keys().hasOnly(['ownerUid', 'label', 'tournamentsCount', 'matchesCount', 'athletesCount', 'deviceName', 'createdAt'])
+        && data.ownerUid == request.auth.uid
+        && isShortStr(data.label, 1, 100)
+        && data.tournamentsCount is number && data.tournamentsCount >= 0 && data.tournamentsCount <= 10000
+        && data.matchesCount is number && data.matchesCount >= 0 && data.matchesCount <= 100000
+        && data.athletesCount is number && data.athletesCount >= 0 && data.athletesCount <= 100000
+        && isOptionalStr(data, 'deviceName', 80)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidClub(data) {
+      return data.keys().hasAll([
+          'ownerUid', 'name', 'city', 'membersCount', 'fundBalanceVnd',
+          'fundEntries', 'socialSessions', 'visibility', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'ownerUid', 'name', 'city', 'homeCourt', 'description', 'skillRange',
+          'membersCount', 'fundBalanceVnd', 'fundEntries', 'socialSessions',
+          'visibility', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.ownerUid)
+        && isShortStr(data.name, 2, 80)
+        && isShortStr(data.city, 2, 60)
+        && isOptionalStr(data, 'homeCourt', 100)
+        && isOptionalStr(data, 'description', 400)
+        && isOptionalStr(data, 'skillRange', 40)
+        && data.membersCount is number && data.membersCount >= 0 && data.membersCount <= 5000
+        && data.fundBalanceVnd is number && data.fundBalanceVnd >= -1000000000 && data.fundBalanceVnd <= 10000000000
+        && data.fundEntries is list && data.fundEntries.size() <= 50
+        && (data.fundEntries.size() == 0 || data.fundEntries[0] is map)
+        && data.socialSessions is list && data.socialSessions.size() <= 20
+        && (data.socialSessions.size() == 0 || data.socialSessions[0] is map)
+        && data.visibility == 'public'
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // =========================================================================
+    // Collection Rules
+    // =========================================================================
+
+    match /test/connection {
+      allow get: if true;
+    }
+
+    match /admins/{adminUid} {
+      allow get: if isValidId(adminUid) && isOwner(adminUid);
+    }
+
+    // 1. Public Athlete Profiles (No PII; Admin-only creation & deletion)
+    match /athletes/{athleteId} {
+      allow get: if isValidId(athleteId) && (
+        (resource == null && isOwner(athleteId)) ||
+        (resource != null && resource.data.visibility == 'public')
+      );
+      allow list: if resource.data.visibility == 'public';
+      allow create: if isAdmin() && isValidId(athleteId) && isValidAthlete(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(athleteId) && isValidAthlete(incoming())
+        && incoming().ownerUid == existing().ownerUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (existing().ownerUid == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly([
+            'displayName', 'gender', 'skillTier', 'club', 'city', 'district', 'playingStyle',
+            'availableForMatch', 'lat', 'lng', 'avatarInitials', 'updatedAt'
+          ])) ||
+          (incoming().diff(existing()).affectedKeys().hasOnly([
+            'duprRating', 'wins', 'losses', 'pointsFor', 'pointsAgainst', 'updatedAt'
+          ]) && incoming().duprRating >= existing().duprRating - 0.35
+             && incoming().duprRating <= existing().duprRating + 0.35
+             && incoming().wins >= existing().wins && incoming().wins <= existing().wins + 1
+             && incoming().losses >= existing().losses && incoming().losses <= existing().losses + 1)
+        );
+      allow delete: if isAdmin() && isValidId(athleteId);
+    }
+
+    // 2. Owner-Only Private Security
+    match /users/{userId}/private/{docId} {
+      allow get: if isValidId(userId) && isValidId(docId) && isOwner(userId);
+      allow list: if isOwner(userId) && resource.data.ownerUid == request.auth.uid;
+      allow create: if isVerified() && isValidId(userId) && isValidId(docId) && isOwner(userId)
+        && isValidUserPrivate(incoming())
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(userId) && isValidId(docId) && isOwner(userId)
+        && isValidUserPrivate(incoming())
+        && incoming().ownerUid == existing().ownerUid
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'twoFactorEnabled', 'totpSecret', 'recoveryCodes',
+          'themeAccent', 'darkMode', 'language',
+          'notifyUpcomingMatch', 'notifyScoreUpdate', 'notifyChatMention', 'notifyPaymentReceipt',
+          'autoCloudBackup', 'updatedAt'
+        ]);
+      allow delete: if isVerified() && isValidId(userId) && isValidId(docId) && isOwner(userId);
+    }
+
+    // 3. Tournaments
+    match /tournaments/{tournamentId} {
+      allow get: if isValidId(tournamentId) && resource.data.visibility == 'public';
+      allow list: if resource.data.visibility == 'public';
+      allow create: if isVerified() && isValidId(tournamentId) && isValidTournament(incoming())
+        && incoming().organizerUid == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(tournamentId) && isValidTournament(incoming())
+        && incoming().organizerUid == existing().organizerUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (existing().organizerUid == request.auth.uid && existing().status != 'completed' && incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'format', 'location', 'city', 'startDate', 'category', 'skillCap',
+            'entryFeeVnd', 'maxTeams', 'registeredCount', 'status',
+            'bankCode', 'bankAccount', 'bankAccountName', 'prizePoolVnd', 'updatedAt'
+          ])) ||
+          (existing().status == 'open'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['registeredCount', 'updatedAt'])
+            && incoming().registeredCount == existing().registeredCount + 1
+            && incoming().registeredCount <= existing().maxTeams)
+        );
+      allow delete: if isVerified() && isValidId(tournamentId) && (existing().organizerUid == request.auth.uid || isAdmin());
+    }
+
+    // 4. Registrations & VietQR Payment Tracking
+    match /registrations/{registrationId} {
+      allow get: if isValidId(registrationId) && resource.data.visibility == 'public';
+      allow list: if resource.data.visibility == 'public';
+      allow create: if isVerified() && isValidId(registrationId) && isValidRegistration(incoming())
+        && incoming().athleteUid == request.auth.uid
+        && incoming().paymentStatus in ['pending', 'paid']
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/tournaments/$(incoming().tournamentId));
+      allow update: if isVerified() && isValidId(registrationId) && isValidRegistration(incoming())
+        && incoming().tournamentId == existing().tournamentId
+        && incoming().athleteUid == existing().athleteUid
+        && incoming().organizerUid == existing().organizerUid
+        && incoming().amountVnd == existing().amountVnd
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (existing().organizerUid == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['paymentStatus', 'receiptCode', 'updatedAt'])) ||
+          (existing().athleteUid == request.auth.uid && existing().paymentStatus == 'pending'
+            && incoming().paymentStatus == 'paid'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['paymentStatus', 'receiptCode', 'updatedAt']))
+        );
+      allow delete: if isVerified() && isValidId(registrationId) && (existing().athleteUid == request.auth.uid || existing().organizerUid == request.auth.uid || isAdmin());
+    }
+
+    // 4b. Venue QR Check-ins (Admin-only write; public attendance visibility)
+    match /checkins/{checkinId} {
+      allow get: if isValidId(checkinId) && resource.data.visibility == 'public';
+      allow list: if resource.data.visibility == 'public';
+      allow create: if isAdmin() && isValidId(checkinId) && isValidCheckIn(incoming())
+        && incoming().checkedInByUid == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isAdmin() && isValidId(checkinId) && isValidCheckIn(incoming())
+        && incoming().tournamentId == existing().tournamentId
+        && incoming().athleteId == existing().athleteId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time;
+      allow delete: if isAdmin() && isValidId(checkinId);
+    }
+
+    // 5. Matches (Live Scores, Bracket, H2H)
+    match /matches/{matchId} {
+      allow get: if isValidId(matchId) && resource.data.visibility == 'public';
+      allow list: if resource.data.visibility == 'public';
+      allow create: if isVerified() && isValidId(matchId) && isValidMatch(incoming())
+        && (incoming().organizerUid == request.auth.uid || isAdmin())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/tournaments/$(incoming().tournamentId));
+      allow update: if isVerified() && isValidId(matchId) && isValidMatch(incoming())
+        && incoming().tournamentId == existing().tournamentId
+        && incoming().organizerUid == existing().organizerUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (existing().status != 'completed' && (existing().organizerUid == request.auth.uid || existing().playerAUid == request.auth.uid || existing().playerBUid == request.auth.uid)
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'scoreA', 'scoreB', 'setsA', 'setsB', 'setHistory', 'targetPoints',
+              'servingSide', 'serverNumber', 'teamAName', 'teamBName',
+              'status', 'winnerSide', 'ratingDelta', 'courtName', 'updatedAt'
+            ]))
+        );
+      allow delete: if isVerified() && isValidId(matchId) && (existing().organizerUid == request.auth.uid || isAdmin());
+    }
+
+    // 6. Team Cup Entries (Rosters with Gender + A/B/C Skill Tier; Admin-only roster mutations)
+    match /teamEntries/{teamId} {
+      allow get: if isValidId(teamId) && resource.data.visibility == 'public';
+      allow list: if resource.data.visibility == 'public';
+      allow create: if isVerified() && isValidId(teamId) && isValidTeamEntry(incoming())
+        && (isAdmin() || (incoming().organizerUid == request.auth.uid && incoming().members.size() == 0))
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(teamId) && isValidTeamEntry(incoming())
+        && incoming().organizerUid == existing().organizerUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'shortCode', 'groupName', 'city', 'members', 'updatedAt'])) ||
+          (existing().organizerUid == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'shortCode', 'groupName', 'city', 'updatedAt']))
+        );
+      allow delete: if isVerified() && isValidId(teamId) && (existing().organizerUid == request.auth.uid || isAdmin());
+    }
+
+    // 7. Team Cup Ties (Group Stage 2-2 Draw, Serie A & Serie B Knockout + Singles Tie-Break)
+    match /teamTies/{tieId} {
+      allow get: if isValidId(tieId) && resource.data.visibility == 'public';
+      allow list: if resource.data.visibility == 'public';
+      allow create: if isVerified() && isValidId(tieId) && isValidTeamTie(incoming())
+        && incoming().organizerUid == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(tieId) && isValidTeamTie(incoming())
+        && incoming().organizerUid == existing().organizerUid
+        && incoming().tournamentId == existing().tournamentId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (existing().organizerUid == request.auth.uid && existing().status != 'completed'
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'teamAId', 'teamBId', 'teamAName', 'teamBName',
+              'subMatches', 'tieBreak', 'courtName', 'scheduledSlot', 'scheduledTime',
+              'status', 'forfeitSide', 'updatedAt'
+            ])) ||
+          (existing().organizerUid == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'courtName', 'scheduledSlot', 'scheduledTime', 'updatedAt'
+            ]))
+        );
+      allow delete: if isVerified() && isValidId(tieId) && (existing().organizerUid == request.auth.uid || isAdmin());
+    }
+
+    // 8. Community Feed Posts & Comments
+    match /communityPosts/{postId} {
+      allow get: if isValidId(postId) && resource.data.visibility == 'public';
+      allow list: if resource.data.visibility == 'public';
+      allow create: if isVerified() && isValidId(postId) && isValidPost(incoming())
+        && incoming().authorUid == request.auth.uid
+        && incoming().likesCount == 0
+        && incoming().commentsCount == 0
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(postId) && isValidPost(incoming())
+        && incoming().authorUid == existing().authorUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          (existing().authorUid == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['content', 'tag', 'updatedAt'])) ||
+          (incoming().diff(existing()).affectedKeys().hasOnly(['likesCount', 'updatedAt'])
+            && (incoming().likesCount == existing().likesCount + 1 || incoming().likesCount == existing().likesCount - 1)) ||
+          (incoming().diff(existing()).affectedKeys().hasOnly(['commentsCount', 'updatedAt'])
+            && incoming().commentsCount == existing().commentsCount + 1)
+        );
+      allow delete: if isVerified() && isValidId(postId) && (existing().authorUid == request.auth.uid || isAdmin());
+
+      match /comments/{commentId} {
+        allow get: if isValidId(postId) && isValidId(commentId) && resource.data.visibility == 'public';
+        allow list: if isValidId(postId) && resource.data.visibility == 'public';
+        allow create: if isVerified() && isValidId(postId) && isValidId(commentId)
+          && isValidComment(incoming())
+          && incoming().createdAt == request.time
+          && exists(/databases/$(database)/documents/communityPosts/$(postId));
+        allow update: if false;
+        allow delete: if isVerified() && isValidId(postId) && isValidId(commentId)
+          && (existing().authorUid == request.auth.uid || isAdmin());
+      }
+    }
+
+    // 9. Group Chat Messages
+    match /chatRooms/{roomId}/messages/{messageId} {
+      allow get: if isValidId(roomId) && isValidId(messageId) && resource.data.visibility == 'public';
+      allow list: if isValidId(roomId) && resource.data.visibility == 'public';
+      allow create: if isVerified() && isValidId(roomId) && isValidId(messageId)
+        && isValidChatMessage(incoming())
+        && incoming().roomId == roomId
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isVerified() && isValidId(roomId) && isValidId(messageId)
+        && (existing().senderUid == request.auth.uid || isAdmin());
+    }
+
+    // 10. Personalized Notifications (Strictly Owner-Only)
+    match /notifications/{notificationId} {
+      allow get: if isValidId(notificationId) && isOwner(resource.data.recipientUid);
+      allow list: if isSignedIn() && resource.data.recipientUid == request.auth.uid;
+      allow create: if isVerified() && isValidId(notificationId) && isValidNotification(incoming())
+        && (incoming().recipientUid == request.auth.uid || isAdmin())
+        && incoming().createdAt == request.time;
+      allow update: if isVerified() && isValidId(notificationId) && isValidNotification(incoming())
+        && existing().recipientUid == request.auth.uid
+        && incoming().recipientUid == existing().recipientUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['read']);
+      allow delete: if isVerified() && isValidId(notificationId) && isOwner(existing().recipientUid);
+    }
+
+    // 11. Nearby Match Challenge Invites
+    match /challenges/{challengeId} {
+      allow get: if isValidId(challengeId) && isSignedIn()
+        && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+      allow list: if isSignedIn()
+        && (resource.data.fromUid == request.auth.uid || resource.data.toUid == request.auth.uid);
+      allow create: if isVerified() && isValidId(challengeId) && isValidChallenge(incoming())
+        && incoming().fromUid == request.auth.uid
+        && incoming().status == 'pending'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(challengeId) && isValidChallenge(incoming())
+        && incoming().fromUid == existing().fromUid
+        && incoming().toUid == existing().toUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && existing().status == 'pending'
+        && (existing().toUid == request.auth.uid || existing().fromUid == request.auth.uid || isAdmin())
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+      allow delete: if isVerified() && isValidId(challengeId) && (existing().fromUid == request.auth.uid || isAdmin());
+    }
+
+    // 12. Cloud Backup Snapshots (Strictly Owner-Only)
+    match /cloudBackups/{backupId} {
+      allow get: if isValidId(backupId) && isOwner(resource.data.ownerUid);
+      allow list: if isSignedIn() && resource.data.ownerUid == request.auth.uid;
+      allow create: if isVerified() && isValidId(backupId) && isValidCloudBackup(incoming())
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isVerified() && isValidId(backupId) && isOwner(existing().ownerUid);
+    }
+
+    // 13. Pickleball Clubs, Fund Ledger & Open-Play Social Sessions (SportConnect Hub)
+    match /clubs/{clubId} {
+      allow get: if isValidId(clubId) && resource.data.visibility == 'public';
+      allow list: if resource.data.visibility == 'public';
+      allow create: if isVerified() && isValidId(clubId) && isValidClub(incoming())
+        && incoming().ownerUid == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerified() && isValidId(clubId) && isValidClub(incoming())
+        && incoming().ownerUid == existing().ownerUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin() ||
+          existing().ownerUid == request.auth.uid ||
+          incoming().diff(existing()).affectedKeys().hasOnly(['socialSessions', 'membersCount', 'updatedAt'])
+        );
+      allow delete: if isVerified() && isValidId(clubId) && (existing().ownerUid == request.auth.uid || isAdmin());
+    }
+  }
+}

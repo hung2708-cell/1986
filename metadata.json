@@ -1,0 +1,11 @@
+{
+  "name": "PickleConnect",
+  "description": "Nền tảng quản lý giải đấu Pickleball, bốc thăm ngẫu nhiên, tỷ số trực tuyến, xếp hạng DUPR thời gian thực, thanh toán VietQR và kết nối cộng đồng.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
